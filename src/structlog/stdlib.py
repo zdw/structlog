@@ -17,6 +17,7 @@ from six import PY3
 
 from structlog._base import BoundLoggerBase
 from structlog._frames import _find_first_app_frame_and_name, _format_stack
+from structlog._loggers import ReturnLogger
 from structlog.exceptions import DropEvent
 
 
@@ -309,6 +310,51 @@ _LEVEL_TO_NAME = dict(
     for k, v in _NAME_TO_LEVEL.items()
     if k not in ("warn", "exception", "notset")
 )
+
+
+def add_level_name(level, name):
+    """
+    Add a custom log level with integer log level 'level' and name 'name'.
+
+    Goes beyond standard library logger as it adds logging functions to
+    the logger.Logger and structlog.stdlib.BoundLogger objects.
+
+    .. versionadded:: 18.3.0
+    """
+
+    global _NAME_TO_LEVEL, _LEVEL_TO_NAME
+
+    globals()[name.upper()] = level
+
+    _NAME_TO_LEVEL.update({name.lower(): level})
+
+    # refresh the reverse dictionary
+    _LEVEL_TO_NAME = dict(
+        (v, k)
+        for k, v in _NAME_TO_LEVEL.items()
+        if k not in ("warn", "exception", "notset")
+    )
+
+    def structlog_logfunc(self, event=None, *args, **kw):
+        return self._proxy_to_logger(name.lower(), event, *args, **kw)
+
+    setattr(BoundLogger, name.lower(), structlog_logfunc)
+
+    # fix ReturnLogger used in testing
+    setattr(ReturnLogger, name.lower(), ReturnLogger.msg)
+
+    # add level to standard logger as well
+    logging.addLevelName(level, name.upper())
+
+    def standard_logger_logfunc(self, message, *args, **kw):
+        if self.isEnabledFor(level):
+            self.log(level, message, args, **kw)
+
+    setattr(logging.Logger, name.lower(), standard_logger_logfunc)
+
+
+# alias to match standard logger function
+addLevelName = add_level_name
 
 
 def filter_by_level(logger, name, event_dict):

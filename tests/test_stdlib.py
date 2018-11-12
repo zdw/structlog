@@ -26,6 +26,7 @@ from structlog.stdlib import (
     PositionalArgumentsFormatter,
     ProcessorFormatter,
     _FixedFindCallerLogger,
+    add_level_name,
     add_log_level,
     add_log_level_number,
     add_logger_name,
@@ -262,6 +263,17 @@ class TestBoundLogger(object):
         assert ((), {"exc_info": 42, "event": "event"}) == bl.exception(
             "event", exc_info=42
         )
+
+    def test_custom_log_level(self):
+        """
+        Test custom log level
+        """
+
+        add_level_name(5, "trace")
+
+        bl = BoundLogger(ReturnLogger(), [return_method_name], {})
+
+        assert "trace" == bl.trace("custom trace level")
 
 
 class TestPositionalArgumentsFormatter(object):
